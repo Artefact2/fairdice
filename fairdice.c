@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 #include <gsl/gsl_sf_gamma.h>
 
 #define MCTS (1 << 15)
@@ -29,11 +30,12 @@ void read_rolls(unsigned int, unsigned int* rcount, unsigned int* n);
 unsigned int ecdf_distance(unsigned int, unsigned int*);
 void ecdf_gen_mc_table(unsigned int sides, unsigned int n, unsigned int count, unsigned int*);
 bool find_in_sorted_array(unsigned int val, unsigned int count, unsigned int* array, unsigned int* low, unsigned int* high);
-double chisq_test(unsigned int, unsigned int*);
+double chisq_test(unsigned int sides, unsigned int n, unsigned int*);
+void confidence_test(unsigned int sides, unsigned int n, unsigned int*);
 
 int main(int argc, char** argv) {
 	if(argc != 2) {
-		fprintf(stderr, "Usage: %s <sides> < rolls.txt\n", argv[0]);
+		fprintf(stderr, "Usage: %s <num-sides> < rolls.txt\n", argv[0]);
 		exit(2);
 	}
 
@@ -49,6 +51,8 @@ int main(int argc, char** argv) {
 		fatal("sample size (%d) not a multiple of sides (%d)", n, sides);
 	}
 
+	printf("SmpSize:   n=%d\n", n);
+
 	unsigned int ecdf_table[MCTS];
 	ecdf_gen_mc_table(sides, n, MCTS, ecdf_table);
 
@@ -56,9 +60,13 @@ int main(int argc, char** argv) {
 	unsigned int lo, hi;
 
 	find_in_sorted_array(dist, MCTS, ecdf_table, &lo, &hi);
-	printf("ECDF:  p=%5.4f\n", (double)(MCTS - lo) / (double)MCTS);
+	printf("ECDF:      p=%5.4f\n", (double)(MCTS - lo) / (double)MCTS);
 
-	printf("ChiSq: p=%5.4f\n", chisq_test(sides, rcount));
+	printf("ChiSq:     p=%5.4f\n", chisq_test(sides, n, rcount));
+
+	printf("ConfInt99:");
+	confidence_test(sides, n, rcount);
+	printf("\n");
 }
 
 void read_rolls(unsigned int sides, unsigned int* rcount, unsigned int* n) {
@@ -84,7 +92,7 @@ void read_rolls(unsigned int sides, unsigned int* rcount, unsigned int* n) {
 }
 
 unsigned int ecdf_distance(unsigned int sides, unsigned int* rcount) {
-	unsigned int cumulative = 0, ideal_cumulative, ideal_step, i, distance;
+	unsigned int cumulative = 0, ideal_cumulative, ideal_step, i, distance, tdist;
 
 	for(i = 0; i < sides; ++i) {
 		cumulative += rcount[i];
@@ -97,7 +105,8 @@ unsigned int ecdf_distance(unsigned int sides, unsigned int* rcount) {
 	for(i = 0; i < sides; ++i) {
 		cumulative -= rcount[i];
 		ideal_cumulative -= ideal_step;
-		distance += (cumulative >= ideal_cumulative) ? (cumulative - ideal_cumulative) : (ideal_cumulative - cumulative);
+		tdist = (cumulative >= ideal_cumulative) ? (cumulative - ideal_cumulative) : (ideal_cumulative - cumulative);
+		if(tdist > distance) distance = tdist;
 	}
 
 	return distance;
@@ -154,19 +163,35 @@ bool find_in_sorted_array(unsigned int val, unsigned int count, unsigned int* ar
 	return false;
 }
 
-double chisq_test(unsigned int sides, unsigned int* rcount) {
-	unsigned int i, ideal, total = 0;
+double chisq_test(unsigned int sides, unsigned int n, unsigned int* rcount) {
+	unsigned int ideal = n / sides;
 	double chisq = 0.0;
 
-	for(i = 0; i < sides; ++i) {
-		total += rcount[i];
-	}
-	ideal = total / sides;
-
-	for(i = 0; i < sides; ++i) {
+	for(unsigned int i = 0; i < sides; ++i) {
 		chisq += (rcount[i] - ideal) * (rcount[i] - ideal);
 	}
-	chisq /= (double)total;
-
+	chisq /= (double)ideal;
+	
 	return 1.0 - gsl_sf_gamma_inc_P((double)(sides - 1) / (double)2, chisq / (double)2);
+}
+
+void confidence_test(unsigned int sides, unsigned int n, unsigned int* rcount) {
+	double f, amp, ideal = 1.0 / (double)sides;
+	bool anomalies = false;
+	
+	for(unsigned int i = 0; i < sides; ++i) {
+		f = (double)rcount[i] / (double)n;
+		amp = 2.575 * sqrt(f * (1.0 - f) / (double)n);
+		if(ideal > f + amp) {
+			printf(" %d-", i+1);
+			anomalies = true;
+		} else if(ideal < f - amp) {
+			printf(" %d+", i+1);
+			anomalies = true;
+		}			
+	}
+
+	if(!anomalies) {
+		printf(" OK");
+	}
 }
