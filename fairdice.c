@@ -23,10 +23,8 @@
 #include <stdbool.h>
 
 #define MCTS (1 << 15)
-#define URANDBUF 64
 
 void read_rolls(unsigned int, unsigned int* rcount, unsigned int* n);
-unsigned int roll(unsigned int);
 unsigned int ecdf_distance(unsigned int, unsigned int*);
 void ecdf_gen_mc_table(unsigned int sides, unsigned int n, unsigned int count, unsigned int*);
 bool find_in_sorted_array(unsigned int val, unsigned int count, unsigned int* array, unsigned int* low, unsigned int* high);
@@ -81,26 +79,6 @@ void read_rolls(unsigned int sides, unsigned int* rcount, unsigned int* n) {
 	}
 }
 
-unsigned int roll(unsigned int sides) {
-	static FILE* urandom = NULL;
-	static long long unsigned int r[URANDBUF];
-	static unsigned int i = URANDBUF;
-
-	if(urandom == NULL) {
-		urandom = fopen("/dev/urandom", "rb");
-		if(urandom == NULL) {
-			fatal("cannot read from /dev/urandom");
-		}
-	}
-
-	if(i == URANDBUF) {
-		fread(&r, sizeof(long long unsigned int), URANDBUF, urandom);
-		i = 0;
-	}
-	
-	return (unsigned int)(r[i++] % sides) + 1;
-}
-
 unsigned int ecdf_distance(unsigned int sides, unsigned int* rcount) {
 	unsigned int cumulative = 0, ideal_cumulative, ideal_step, i, distance;
 
@@ -133,7 +111,7 @@ void ecdf_gen_mc_table(unsigned int sides, unsigned int n, unsigned int count, u
 		memset(rcount, 0, sides * sizeof(unsigned int));
 
 		for(j = 0; j < n; ++j) {
-			++(rcount[roll(sides) - 1]);
+			++(rcount[rand() % sides]);
 		}
 		
 		table[i] = ecdf_distance(sides, rcount);
