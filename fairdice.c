@@ -58,9 +58,10 @@ int main(int argc, char** argv) {
 
 	unsigned int dist = ecdf_distance(sides, rcount);
 	unsigned int lo, hi;
+	bool found;
 
-	find_in_sorted_array(dist, MCTS, ecdf_table, &lo, &hi);
-	printf("ECDF:      p=%5.4f\n", (double)(MCTS - lo) / (double)MCTS);
+	found = find_in_sorted_array(dist, MCTS, ecdf_table, &lo, &hi);
+	printf("ECDF:      p%s%5.4f\n", found ? "=" : "<", found ? (1.0 - (double)(lo + hi) / (double)(2 * MCTS)) : ((double)(MCTS - lo) / (double)MCTS));
 
 	printf("ChiSq:     p=%5.4f\n", chisq_test(sides, n, rcount));
 
@@ -152,6 +153,10 @@ bool find_in_sorted_array(unsigned int val, unsigned int count, unsigned int* ar
 
 		if(array[mid] == val) {
 			*low = *high = mid;
+			while(*low < count && array[*low] == val) --(*low);
+			++(*low);
+			while(*high < count && array[*high] == val) ++high;
+			--(*high);
 			return true;
 		} else if(array[mid] > val) {
 			*high = mid;
