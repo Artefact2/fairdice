@@ -1,15 +1,16 @@
 CC?=clang
 CFLAGS?=-Wall -Wextra -pedantic -std=c11
+LDFLAGS=-lgsl -lgslcblas -lm
 
 default: fairdice.debug fairdice
 
 fairdice.debug: fairdice.c
-	$(CC) $(CFLAGS) -g -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -g -o $@ $<
 
 fairdice: fairdice.c
-	$(CC) $(CFLAGS) -O2 -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -O2 -o $@ $<
 
 fairdice.prof: fairdice.c
-	$(CC) $(CFLAGS) -g -lprofiler -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -g -lprofiler -o $@ $<
 
 .PHONY: default

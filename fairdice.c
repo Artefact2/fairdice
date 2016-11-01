@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <gsl/gsl_sf_gamma.h>
 
 #define MCTS (1 << 15)
 
@@ -28,6 +29,7 @@ void read_rolls(unsigned int, unsigned int* rcount, unsigned int* n);
 unsigned int ecdf_distance(unsigned int, unsigned int*);
 void ecdf_gen_mc_table(unsigned int sides, unsigned int n, unsigned int count, unsigned int*);
 bool find_in_sorted_array(unsigned int val, unsigned int count, unsigned int* array, unsigned int* low, unsigned int* high);
+double chisq_test(unsigned int, unsigned int*);
 
 int main(int argc, char** argv) {
 	if(argc != 2) {
@@ -54,7 +56,9 @@ int main(int argc, char** argv) {
 	unsigned int lo, hi;
 
 	find_in_sorted_array(dist, MCTS, ecdf_table, &lo, &hi);
-	printf("ECDF: p<%5.4f\n", (double)(MCTS - lo) / (double)MCTS);
+	printf("ECDF:  p=%5.4f\n", (double)(MCTS - lo) / (double)MCTS);
+
+	printf("ChiSq: p=%5.4f\n", chisq_test(sides, rcount));
 }
 
 void read_rolls(unsigned int sides, unsigned int* rcount, unsigned int* n) {
@@ -148,4 +152,21 @@ bool find_in_sorted_array(unsigned int val, unsigned int count, unsigned int* ar
 	}
 
 	return false;
+}
+
+double chisq_test(unsigned int sides, unsigned int* rcount) {
+	unsigned int i, ideal, total = 0;
+	double chisq = 0.0;
+
+	for(i = 0; i < sides; ++i) {
+		total += rcount[i];
+	}
+	ideal = total / sides;
+
+	for(i = 0; i < sides; ++i) {
+		chisq += (rcount[i] - ideal) * (rcount[i] - ideal);
+	}
+	chisq /= (double)total;
+
+	return 1.0 - gsl_sf_gamma_inc_P((double)(sides - 1) / (double)2, chisq / (double)2);
 }
